@@ -20,6 +20,22 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## SSR Handling
+
+This project integrates a Tiptap-based rich text editor which requires browser-specific APIs (like `window` and `document`). To avoid Server-Side Rendering (SSR) issues and hydration mismatches, we've implemented a "double-layer" fix:
+
+### 1. Dynamic Import with No SSR (Prevents Server Crashes)
+In `src/app/page.tsx`, the `RichTextEditor` is loaded using Next.js `dynamic` with the `ssr: false` option. 
+*   **Reason:** Tiptap and its dependencies often reference `window` or `document` as soon as they are imported. Without this, the server would crash with a `ReferenceError: window is not defined`.
+
+### 2. Tiptap Configuration Patch (Prevents Hydration Mismatch)
+A patch is applied to the `@vishal4500/rich-text-editor` package (via `patch-package`) to set `immediatelyRender: false` in the Tiptap editor configuration. 
+*   **Reason:** Even when loaded only on the client, Tiptap's default behavior is to render its internal HTML structure immediately upon instantiation. If Tiptap modifies the DOM before React finishes "syncing" the server-provided HTML with client-side state, a **Hydration Mismatch** error occurs. Setting this to `false` ensures the editor waits until the React component is fully mounted.
+
+### 3. Suppress Hydration Warning
+In `src/app/layout.tsx`, the `suppressHydrationWarning` attribute is used on the `<body>` (or relevant wrapper).
+*   **Reason:** Since we "hide" the editor from the server (via `ssr: false`), the initial server-sent HTML differs from the first client-side frame. This attribute silences the unavoidable UI warnings during this transition.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
